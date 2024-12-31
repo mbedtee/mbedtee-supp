@@ -49,14 +49,15 @@
 #define TEE_GEN_CAP_REG_MEM	(1 << 2)/* Supports registering shared memory */
 #define TEE_GEN_CAP_MEMREF_NULL	(1 << 3)/* NULL MemRef support */
 
-#define TEE_MEMREF_NULL		(__u64)(-1) /* NULL MemRef Buffer */
+#define TEE_MEMREF_NULL		((__u64)(-1)) /* NULL MemRef Buffer */
 
 /*
  * TEE Implementation ID
  */
 #define TEE_IMPL_ID_OPTEE	1
 #define TEE_IMPL_ID_AMDTEE	2
-#define TEE_IMPL_ID_MBEDTEE	3
+
+#define TEE_IMPL_ID_MBEDTEE	8
 
 /*
  * OP-TEE specific capabilities
