@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+// SPDX-License-Identifier: Apache-2.0
 /*
  * Copyright (c) 2019, KapaXL Limited
  * FS supplicant for mbedtee-reefs
@@ -20,7 +20,7 @@
 #include "supp.h"
 
 //#define MSG printf
-#define MSG(...) do {} while(0)
+#define MSG(...) do {} while (0)
 
 #define REEFS_PATH_MAX (1024)
 
@@ -31,7 +31,11 @@ static int reefs_mkdirs(const char *path, mode_t mode)
 	int i, len = strlen(path), ret;
 	char dir[REEFS_PATH_MAX];
 
-	strcpy(dir, path);
+	if (len >= REEFS_PATH_MAX)
+		return -ENAMETOOLONG;
+
+	memcpy(dir, path, len);
+	dir[len] = 0;
 
 	for (i = 0; i <= len; i++) {
 		if ((dir[i] == '/' && i > 0) || (i == len)) {
@@ -41,9 +45,9 @@ static int reefs_mkdirs(const char *path, mode_t mode)
 
 				ret = mkdir(dir, mode);
 				if (ret < 0) {
-					ret = -errno;
-					MSG("mkdir %s failed\n", dir);
-					return ret;
+					ret = errno;
+					MSG("mkdir %s, failed %d\n", dir, ret);
+					return -ret;
 				}
 			}
 			dir[i] = '/';
@@ -75,28 +79,35 @@ static int reefs_open(struct reefs_cmd *r)
 
 	reefs_path_prefix(path, (const char *)r->data);
 
-	MSG("opening file %s flags 0x%x\n", path, r->flags);
-
 	if (r->flags & O_CREAT) {
+		MSG("creating %s\n", path);
 		/* make parent directory */
-		strcpy(dir, path);
-		l = strlen(dir);
+		l = strlen(path);
+		if (l >= REEFS_PATH_MAX)
+			return -ENAMETOOLONG;
+		memcpy(dir, path, l);
+		dir[l] = 0;
+
 		for (i = l - 1; i >= 0; i--) {
 			if (dir[i] == '/') {
 				dir[i] = 0;
-				if (i != l -1)
+				if (i != l - 1)
 					break;
 			}
 		}
 		ret = reefs_mkdirs(dir, 0700);
 		if (ret != 0)
 			return ret;
+	} else {
+		MSG("opening %s\n", path);
 	}
 
 	ret = open(path, r->flags, 0600);
 	if (ret < 0) {
 		ret = -errno;
-		MSG("open %s, errno %d\n", path, errno);
+		MSG("open %s, error %d\n", path, errno);
+	} else {
+		MSG("open %s, fd %d\n", path, ret);
 	}
 
 	return ret;
@@ -106,7 +117,11 @@ static int reefs_close(struct reefs_cmd *r)
 {
 	int ret = close(r->fd);
 
-	return ret ? -errno : ret;
+	ret = ret ? -errno : ret;
+
+	MSG("close %d, ret %d\n", r->fd, ret);
+
+	return ret;
 }
 
 static ssize_t reefs_read(struct reefs_cmd *r)
@@ -124,9 +139,9 @@ static ssize_t reefs_read(struct reefs_cmd *r)
 			break;
 		} else if (rc == 0) {
 			break;
-		} else {
-			offset += rc;
 		}
+
+		offset += rc;
 	}
 
 	return (rc < 0) ? rc : offset;
@@ -147,9 +162,9 @@ static ssize_t reefs_write(struct reefs_cmd *r)
 			break;
 		} else if (rc == 0) {
 			break;
-		} else {
-			offset += rc;
 		}
+
+		offset += rc;
 	}
 
 	return (rc < 0) ? rc : offset;
@@ -269,7 +284,7 @@ static int reefs_readdir(struct reefs_cmd *r)
 	structsz = sizeof(d->d_reclen) + sizeof(d->d_off) + sizeof(d->d_type);
 
 	while (cnt && ((e = readdir(dir)) != NULL)) {
-		if ((e->d_name[0] == '.') && \
+		if ((e->d_name[0] == '.') &&
 			(e->d_name[1] == 0 || e->d_name[1] == '.'))
 			continue;
 

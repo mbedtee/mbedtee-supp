@@ -1,21 +1,24 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+// SPDX-License-Identifier: Apache-2.0
 /*
  * Copyright (c) 2019, KapaXL Limited
  * FS supplicant for mbedtee, e.g. REEFS
  */
-#include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <pthread.h>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <stdbool.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 #include "supp.h"
 
@@ -38,7 +41,7 @@ static int recv_request(int fd, union tee_iocl_supp *supp)
 			sizeof(struct tee_ioctl_param) * supp->r.num_params;
 
 	if (ioctl(fd, TEE_IOC_SUPPL_RECV, &data)) {
-		printf("recv_request: %s\n", strerror(errno));
+		printf("%s: %s\n", __func__, strerror(errno));
 		return -errno;
 	}
 
@@ -56,7 +59,7 @@ static int send_response(int fd, union tee_iocl_supp *supp)
 	       sizeof(struct tee_ioctl_param) * supp->s.num_params;
 
 	if (ioctl(fd, TEE_IOC_SUPPL_SEND, &data)) {
-		printf("send_response: %s\n", strerror(errno));
+		printf("%s: %s\n", __func__, strerror(errno));
 		return -errno;
 	}
 
@@ -134,6 +137,20 @@ static int process_request(int fd, int shm_id, void *shm)
 	return 0;
 }
 
+static int instance_lock(bool is_lock)
+{
+	static int fd = -1;
+
+ 	if (!is_lock) {
+		flock(fd, LOCK_UN);
+		return 0;
+	}
+
+	fd = open("/var/tmp/mbedtee-supp", O_WRONLY | O_CREAT);
+
+	return flock(fd, LOCK_EX | LOCK_NB);
+}
+
 int main(int argc, char *argv[])
 {
 	int fd = -1;
@@ -141,6 +158,12 @@ int main(int argc, char *argv[])
 	void *shm = NULL;
 	struct tee_ioctl_version_data vers;
 	struct sched_param p = {.sched_priority = 0};
+
+	ret = instance_lock(true);
+	if (ret < 0) {
+		printf("lock supp: %s\n", strerror(errno));
+		return ret;
+	}
 
 restart:
 	fd = open("/dev/tee0", O_RDWR);
@@ -161,7 +184,8 @@ restart:
 	p.sched_priority = sched_get_priority_max(SCHED_FIFO);
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &p);
 
-	if ((ret = daemon(0, 0)) < 0) {
+	ret = daemon(0, 0);
+	if (ret < 0) {
 		printf("daemon(): %s\n", strerror(errno));
 		goto out;
 	}
@@ -181,5 +205,6 @@ restart:
 
 out:
 	close(fd);
+	instance_lock(false);
 	return -1;
 }
