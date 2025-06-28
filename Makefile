@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2019 KapaXL (kapa.xl@outlook.com)
+# Copyright (c) 2019 Xing Loong <xing.xl.loong@gmail.com>
 
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
