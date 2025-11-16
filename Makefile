@@ -5,18 +5,18 @@ CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 STRIP = $(CROSS_COMPILE)strip
 
-CFLAGS = -g -O2 -Wall -Werror -std=gnu99 -MD -MP \
-	-D_GNU_SOURCE -Iinclude -I$(MBEDTEE_INC)
+CFLAGS = -g -O1 -Wall -Werror -std=gnu99 -MD -MP \
+	-D_GNU_SOURCE -Iinclude
 LDFLAGS = -lpthread
 
-.PHONE: all
-all: mbedtee_supp
+.PHONY: all clean
+all: mbedtee-supp
 
-OBJS = main.o reefs.o
+OBJS = main.o reefs.o rpmb.o
 
 -include $(OBJS:.o=.d)
 
-mbedtee_supp: $(OBJS)
+mbedtee-supp: $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
 	$(STRIP) $@
 
@@ -24,4 +24,4 @@ mbedtee_supp: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	@rm -f $(OBJS) mbedtee_supp
+	@rm -f $(OBJS) $(OBJS:.o=.d) mbedtee-supp
